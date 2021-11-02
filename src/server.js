@@ -1,55 +1,44 @@
-import express from "express";
 import http from "http";
-import WebSocket from "ws";
+import SocketIO from "socket.io";
+import express from "express";
 
 const app = express();
 
-app.set('view engine', 'pug');
-app.set('views', __dirname + '/views'); //__dirname은 현재 실행하는 파일의 절대경로이다.
+app.set("view engine", "pug");
+app.set("views", __dirname + "/views");
 app.use("/public", express.static(__dirname + "/public"));
-app.get("/", (req, res) => res.render("home"));
-app.get("/*", (req,res) => res.redirect("/"));
+app.get("/", (_, res) => res.render("home"));
+app.get("/*", (_, res) => res.redirect("/"));
 
-//console.log('__dirname : ', __dirname);
-const handleListen = () => console.log(`Listening on http://localhost:5000`);
+const httpServer = http.createServer(app);
+const wsServer = SocketIO(httpServer);
 
-// 같은 서버에 http, webSocket 모두 작동 시키기 (선택사항)
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+wsServer.on("connection", (socket) => {
+    socket["nickname"]  = "Anon";
+    socket.onAny((event) => {
+        console.log(`Socket Event: ${event}`);
+    });
 
+    socket.on("enter_room", (roomName, done) => {
+        console.log(roomName);
+        socket.join(roomName);
+        done();
+        socket.to(roomName).emit("welcome", socket["nickname"]); // "welcome"을 방안에 있는 모두에게 보냄
+    });
 
-const sockets = [];
+    socket.on("disconnecting", () => {
+        socket.rooms.forEach((room) => socket.to(room).emit("bye", socket["nickname"]));
+    });
 
-wss.on("connection", (backSocket) => {
-    sockets.push(backSocket); // 각 브라우저에 연결될 때마다 이 array를 넣어줌.
-    backSocket["nickname"] = "Anon"
+    socket.on("new_message", (msg, room, done) => {
+        socket.to(room).emit("new_message", `${socket["nickname"]}: ${msg}`);
+        done(); // 백엔드에서 실행하는 것이 아닌, done(); 호출했을 때 프론트엔드에서 코드를 실행할거임.
+    });
+    
+    socket.on("nickname", (nickname) => (socket["nickname"] = nickname));
 
-    console.log("Connected to Browser"); // socket = 연결된 브라우저
-    backSocket.on("close",() => {console.log("Disconnected to Browser");})
-    backSocket.on("message", (messageFromFront) => {
-        const message = JSON.parse(messageFromFront);
-        switch(message.type){
-            case "new_message" : 
-                sockets.forEach((aSocket) => 
-                    //aSocket.send(message.payload.toString())
-                    aSocket.send(`${backSocket.nickname}: ${message.payload}`)
-                    // nickname의 속성을 socket object에 저장하고 있음.
-                );
-                break;
-            case "nickname" : 
-                backSocket["nickname"] = message.payload;
-                //console.log(message.payload);
-                console.log(sockets)
-                break;
-        }   
-        
-        //sockets.forEach((aSocket) => aSocket.send(messageFromFront.toString()));
-        //console.log(typeof(parsed), typeof(messageFromFront));
-        //console.log('message From -> '+ typeof(messageFromFront));
-    })
 });
 
 
-
-
-server.listen(5000, handleListen);
+const handleListen = () => console.log(`Listening on http://localhost:5000`);
+httpServer.listen(5000, handleListen);

@@ -8,13 +8,21 @@ html(lang="en")
         title Zoom Clone
     body
         header  
-            h1 It works!
+            h1 Zoom Clone
         main
-            form#nick
-                input(type="text", placeholder="Input Your NickName", require)
-                button Submit
-            ul
-            form#message
-                input(type="text", placeholder="Input Your Message", require)
-                button Send
+            div#welcome
+                form
+                    input(placeholder="room name", required, type="text")
+                    button Enter Room
+            div#room
+                h3
+                ul
+                form#name
+                    input(placeholder="your Nickname", required, type="text")
+                    button Save
+                form#msg
+                    input(placeholder="message", required, type="text")
+                    button Send
+        script(src="/socket.io/socket.io.js")
         script(src="/public/js/app.js")
+        
